@@ -55,6 +55,7 @@ public final class MLXProfiler: @unchecked Sendable {
         stepCount = 0
         totalStepsCount = 0
         lock.unlock()
+        resetLLMState()
     }
 
     public func disable() {
