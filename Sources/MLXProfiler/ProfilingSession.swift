@@ -279,13 +279,14 @@ public final class ProfilingSession: @unchecked Sendable {
 extension ProfilingSession {
     public static func inferCategory(_ phaseName: String) -> ProfilingCategory {
         let name = phaseName.lowercased()
+        // Check "unload" before "load" — "unload text" contains "load text"
+        if name.contains("unload text") || name.contains("unload gemma") { return .textEncoderUnload }
+        if name.contains("unload transformer") { return .transformerUnload }
         if name.contains("load text") || name.contains("load gemma") { return .textEncoderLoad }
         if name.contains("vlm") || name.contains("prompt enhancement") { return .vlmInterpretation }
         if name.contains("tokeniz") { return .tokenization }
         if name.contains("text encod") { return .textEncoding }
-        if name.contains("unload text") || name.contains("unload gemma") { return .textEncoderUnload }
         if name.contains("load transformer") { return .transformerLoad }
-        if name.contains("unload transformer") { return .transformerUnload }
         if name.contains("load vae") { return .vaeLoad }
         if name.contains("load audio") || name.contains("audio model") { return .audioLoad }
         if name.contains("audio denois") { return .audioDenoise }
