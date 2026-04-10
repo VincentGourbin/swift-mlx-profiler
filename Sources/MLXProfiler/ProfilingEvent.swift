@@ -40,6 +40,7 @@ public enum ProfilingCategory: String, Codable, Sendable {
     case prefill = "prefill"
     case generation = "generation"
     case generationStep = "generation_step"
+    case decoding = "decoding"
     case kvCache = "kv_cache"
     case visionEncode = "vision_encode"
     case audioEncode = "audio_encode"
@@ -55,7 +56,7 @@ public enum ProfilingCategory: String, Codable, Sendable {
         switch self {
         case .textEncoderLoad, .textEncoding, .textEncoderUnload, .vlmInterpretation, .tokenization: return 1
         case .transformerLoad, .denoisingLoop, .denoisingStep, .transformerUnload: return 2
-        case .prefill, .generation, .generationStep, .kvCache: return 2
+        case .prefill, .generation, .generationStep, .decoding, .kvCache: return 2
         case .upscaler: return 3
         case .vaeLoad, .vaeDecode: return 4
         case .audioLoad, .audioDenoise, .audioEncode: return 5
@@ -73,7 +74,7 @@ public enum ProfilingCategory: String, Codable, Sendable {
         switch self {
         case .textEncoderLoad, .textEncoding, .textEncoderUnload, .vlmInterpretation, .tokenization: return "Text Encoding"
         case .transformerLoad, .denoisingLoop, .denoisingStep, .transformerUnload: return "Transformer"
-        case .prefill, .generation, .generationStep, .kvCache: return "Inference"
+        case .prefill, .generation, .generationStep, .decoding, .kvCache: return "Inference"
         case .upscaler: return "Upscaler"
         case .vaeLoad, .vaeDecode: return "VAE"
         case .audioLoad, .audioDenoise, .audioEncode: return "Audio"
@@ -109,6 +110,7 @@ public enum ProfilingCategory: String, Codable, Sendable {
         case .audioDenoise: return 15
         case .audioEncode: return 14
         case .visionEncode: return 5
+        case .decoding: return 10
         case .kvCache: return 10
         case .frameConversion: return 16
         case .videoWrite: return 17

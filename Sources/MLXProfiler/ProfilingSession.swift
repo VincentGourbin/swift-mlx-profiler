@@ -295,6 +295,7 @@ extension ProfilingSession {
         if name.contains("frame conver") { return .frameConversion }
         if name.contains("video write") { return .videoWrite }
         if name.contains("prefill") { return .prefill }
+        if name.contains("decod") { return .decoding }
         if name.contains("generat") { return .generation }
         if name.contains("vision") { return .visionEncode }
         if name.contains("post") || name.contains("export") { return .postProcess }
