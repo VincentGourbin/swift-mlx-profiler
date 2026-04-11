@@ -93,8 +93,8 @@ public final class ProfilingSession: @unchecked Sendable {
         lock.unlock()
     }
 
-    /// Record a step (denoising step, generation token, etc.)
-    public func recordStep(index: Int, total: Int, durationUs: UInt64) {
+    /// Record a step (denoising step, generation token, TTS frame, etc.)
+    public func recordStep(index: Int, total: Int, durationUs: UInt64, category: ProfilingCategory = .denoisingStep) {
         signposter.emitEvent("Step", id: signposter.makeSignpostID(), "Step \(index)/\(total) \(durationUs / 1000)ms")
 
         let ts = currentTimestampUs()
@@ -106,7 +106,7 @@ public final class ProfilingSession: @unchecked Sendable {
 
         lock.lock()
         events.append(ProfilingEvent(
-            name: "Step \(index)/\(total)", category: .denoisingStep, phase: .complete,
+            name: "Step \(index)/\(total)", category: category, phase: .complete,
             timestampUs: startTs, durationUs: durationUs,
             mlxActiveBytes: mlx.activeBytes, mlxCacheBytes: mlx.cacheBytes,
             mlxPeakBytes: mlx.peakBytes, processFootprintBytes: footprint,
@@ -203,7 +203,7 @@ public final class ProfilingSession: @unchecked Sendable {
                     beginTimestamps.removeValue(forKey: event.name)
                 }
             case .complete:
-                if event.category == .denoisingStep || event.category == .generationStep,
+                if [.denoisingStep, .generationStep, .semanticCodeGen, .flowMatching, .codecDecode].contains(event.category),
                    let dur = event.durationUs {
                     stepDurations.append(Double(dur) / 1000.0)
                 }
@@ -290,6 +290,14 @@ extension ProfilingSession {
         if name.contains("load vae") { return .vaeLoad }
         if name.contains("load audio") || name.contains("audio model") { return .audioLoad }
         if name.contains("audio denois") { return .audioDenoise }
+        // Speech / TTS categories
+        if name.contains("mel") || name.contains("spectrogram") { return .melSpectrogram }
+        if name.contains("audio feature") || name.contains("feature extract") { return .audioFeatureExtract }
+        if name.contains("semantic code") || name.contains("semantic gen") { return .semanticCodeGen }
+        if name.contains("flow match") { return .flowMatching }
+        if name.contains("codec") || name.contains("waveform decode") { return .codecDecode }
+        if name.contains("voice embed") { return .voiceEmbedding }
+        if name.contains("audio write") || name.contains("wav write") { return .audioWrite }
         if name.contains("upscal") { return .upscaler }
         if name.contains("denois") { return .denoisingLoop }
         if name.contains("vae decode") || name.contains("vae forward") { return .vaeDecode }
@@ -299,6 +307,7 @@ extension ProfilingSession {
         if name.contains("decod") { return .decoding }
         if name.contains("generat") { return .generation }
         if name.contains("vision") { return .visionEncode }
+        if name.contains("audio encod") { return .audioEncode }
         if name.contains("post") || name.contains("export") { return .postProcess }
         return .custom
     }

@@ -36,6 +36,15 @@ public enum ProfilingCategory: String, Codable, Sendable {
     case frameConversion = "frame_conversion"
     case videoWrite = "video_write"
 
+    // MARK: - Speech / TTS
+    case melSpectrogram = "mel_spectrogram"
+    case audioFeatureExtract = "audio_feature_extract"
+    case semanticCodeGen = "semantic_code_gen"
+    case flowMatching = "flow_matching"
+    case codecDecode = "codec_decode"
+    case voiceEmbedding = "voice_embedding"
+    case audioWrite = "audio_write"
+
     // MARK: - LLM
     case prefill = "prefill"
     case generation = "generation"
@@ -60,7 +69,9 @@ public enum ProfilingCategory: String, Codable, Sendable {
         case .upscaler: return 3
         case .vaeLoad, .vaeDecode: return 4
         case .audioLoad, .audioDenoise, .audioEncode: return 5
-        case .frameConversion, .videoWrite, .postProcess: return 6
+        case .melSpectrogram, .audioFeatureExtract, .codecDecode, .voiceEmbedding: return 5
+        case .semanticCodeGen, .flowMatching: return 2
+        case .frameConversion, .videoWrite, .audioWrite, .postProcess: return 6
         case .visionEncode: return 5
         case .memoryOp: return 7
         case .evalSync: return 8
@@ -78,7 +89,9 @@ public enum ProfilingCategory: String, Codable, Sendable {
         case .upscaler: return "Upscaler"
         case .vaeLoad, .vaeDecode: return "VAE"
         case .audioLoad, .audioDenoise, .audioEncode: return "Audio"
-        case .frameConversion, .videoWrite, .postProcess: return "Post-processing"
+        case .melSpectrogram, .audioFeatureExtract, .codecDecode, .voiceEmbedding: return "Audio"
+        case .semanticCodeGen, .flowMatching: return "Inference"
+        case .frameConversion, .videoWrite, .audioWrite, .postProcess: return "Post-processing"
         case .visionEncode: return "Vision"
         case .memoryOp: return "Memory"
         case .evalSync: return "eval() Syncs"
@@ -109,16 +122,23 @@ public enum ProfilingCategory: String, Codable, Sendable {
         case .audioLoad: return 14
         case .audioDenoise: return 15
         case .audioEncode: return 14
+        case .melSpectrogram: return 14
+        case .audioFeatureExtract: return 14
+        case .voiceEmbedding: return 15
+        case .semanticCodeGen: return 8
+        case .flowMatching: return 9
+        case .codecDecode: return 16
         case .visionEncode: return 5
         case .decoding: return 10
         case .kvCache: return 10
-        case .frameConversion: return 16
-        case .videoWrite: return 17
-        case .postProcess: return 18
-        case .evalSync: return 19
-        case .memoryOp: return 20
-        case .modelUnload: return 21
-        case .custom: return 22
+        case .frameConversion: return 17
+        case .videoWrite: return 18
+        case .audioWrite: return 18
+        case .postProcess: return 19
+        case .evalSync: return 20
+        case .memoryOp: return 21
+        case .modelUnload: return 22
+        case .custom: return 23
         }
     }
 }
