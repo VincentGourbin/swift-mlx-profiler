@@ -2,20 +2,23 @@
 // Copyright 2026 Vincent Gourbin
 
 import Foundation
+#if canImport(IOKit)
 import IOKit
+#endif
 import MLX
 
 /// Low-level system metrics for Apple Silicon.
 ///
-/// Provides GPU utilization (via IOKit), CPU time (via rusage), and memory
+/// Provides GPU utilization (via IOKit on macOS), CPU time (via rusage), and memory
 /// footprint (via task_info) without requiring root access.
 public enum SystemMetrics {
 
-    /// Instantaneous GPU utilization % (0-100) from IOKit.
+    /// Instantaneous GPU utilization % (0-100).
     ///
-    /// Reads `Device Utilization %` from the AGX accelerator driver.
-    /// Works on Apple Silicon without root. Returns 0 if unavailable.
+    /// On macOS: reads `Device Utilization %` from the AGX accelerator driver via IOKit.
+    /// On iOS: returns 0 (IOKit is not available; use Instruments for GPU profiling).
     public static func gpuUtilization() -> Int {
+        #if canImport(IOKit)
         var iterator: io_iterator_t = 0
         let matching = IOServiceMatching("IOAccelerator")
         guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else { return 0 }
@@ -35,6 +38,9 @@ public enum SystemMetrics {
             service = IOIteratorNext(iterator)
         }
         return 0
+        #else
+        return 0
+        #endif
     }
 
     /// Cumulative CPU time (user + system) for this process in seconds.

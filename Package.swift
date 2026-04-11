@@ -5,7 +5,8 @@ import PackageDescription
 let package = Package(
     name: "swift-mlx-profiler",
     platforms: [
-        .macOS(.v15)
+        .macOS(.v15),
+        .iOS(.v17)
     ],
     products: [
         .library(name: "MLXProfiler", targets: ["MLXProfiler"]),
