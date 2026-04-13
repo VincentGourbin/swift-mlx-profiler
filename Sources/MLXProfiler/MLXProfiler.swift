@@ -26,7 +26,8 @@ import Foundation
 public final class MLXProfiler: @unchecked Sendable {
     public static let shared = MLXProfiler()
 
-    private let lock = NSLock()
+    // Note: lock is internal so TrainingProfiling extension can use it
+    internal let lock = NSLock()
     private var _isEnabled = false
     private var _activeSession: ProfilingSession? = nil
     private var timings: [TimingEntry] = []
@@ -34,6 +35,11 @@ public final class MLXProfiler: @unchecked Sendable {
     private var stepCount: Int = 0
     private var totalStepsCount: Int = 0
     private var activeTimers: [String: Date] = [:]
+
+    // Training metrics storage (accessed under lock)
+    internal var trainingSteps: [TrainingStepMetrics] = []
+    internal var validationEntries: [ValidationMetrics] = []
+    internal var trainingStartTime: Date? = nil
 
     private init() {}
 

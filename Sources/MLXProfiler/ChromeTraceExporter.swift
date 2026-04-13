@@ -70,6 +70,22 @@ public struct ChromeTraceExporter {
             ])
         }
 
+        // Counter values (training loss curves, custom metrics)
+        for counter in session.getCounterValues() {
+            var args: [String: Any] = [:]
+            for (key, value) in counter.values {
+                args[key] = round(value * 10000) / 10000
+            }
+            traceEvents.append([
+                "name": counter.name as Any, "cat": "training" as Any, "ph": "C" as Any,
+                "ts": Int(counter.timestampUs) as Any, "pid": pid as Any, "tid": 9 as Any,
+                "args": args as [String: Any],
+            ])
+        }
+        if !session.getCounterValues().isEmpty {
+            traceEvents.append(metadataEvent(name: "thread_name", pid: pid, tid: 9, args: ["name": "Training Metrics"]))
+        }
+
         // Session metadata
         traceEvents.append([
             "name": "Session Info" as Any, "cat": "metadata" as Any, "ph": "i" as Any,

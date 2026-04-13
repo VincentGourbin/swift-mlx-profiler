@@ -117,6 +117,34 @@ public final class ProfilingSession: @unchecked Sendable {
         lock.unlock()
     }
 
+    // MARK: - Counter Events (pour courbes dans Chrome Trace)
+
+    /// Ajoute un counter event pour visualiser des metriques en courbe dans Perfetto UI
+    public func addCounterEvent(name: String, timestampUs: UInt64, values: [String: Double]) {
+        lock.lock()
+        // Les counter events sont representes comme des events "C" avec des args
+        events.append(ProfilingEvent(
+            name: name, category: .custom, phase: .counter,
+            timestampUs: timestampUs
+        ))
+        // Stocker les valeurs dans le metadata pour l'export Chrome Trace
+        _counterValues.append(CounterValue(name: name, timestampUs: timestampUs, values: values))
+        lock.unlock()
+    }
+
+    /// Expose le timestamp courant pour les extensions
+    public func currentTimestampUsPublic() -> UInt64 {
+        currentTimestampUs()
+    }
+
+    /// Retourne les counter values pour l'export
+    public func getCounterValues() -> [CounterValue] {
+        lock.lock(); defer { lock.unlock() }
+        return _counterValues
+    }
+
+    private var _counterValues: [CounterValue] = []
+
     // MARK: - Data Access
 
     public func getEvents() -> [ProfilingEvent] {
@@ -311,6 +339,13 @@ extension ProfilingSession {
         if name.contains("post") || name.contains("export") { return .postProcess }
         return .custom
     }
+}
+
+/// Counter value for Chrome Trace counter events (loss curves, memory, etc.)
+public struct CounterValue: Sendable {
+    public let name: String
+    public let timestampUs: UInt64
+    public let values: [String: Double]
 }
 
 /// Shared duration formatter
