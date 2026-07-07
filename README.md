@@ -2,7 +2,7 @@
 
 Performance profiling framework for [MLX](https://github.com/ml-explore/mlx-swift) models on Apple Silicon.
 
-[![](https://img.shields.io/badge/Platform-macOS_15+-blue)](https://developer.apple.com/macos/) [![](https://img.shields.io/badge/Swift-6.0-orange)](https://swift.org) [![Website](https://img.shields.io/badge/Website-www.vinceforge.com-blue)](https://www.vinceforge.com)
+[![](https://img.shields.io/badge/Platform-macOS_15+-blue)](https://developer.apple.com/macos/) [![](https://img.shields.io/badge/Swift-6.2-orange)](https://swift.org) [![Website](https://img.shields.io/badge/Website-www.vinceforge.com-blue)](https://www.vinceforge.com)
 
 ## Features
 
