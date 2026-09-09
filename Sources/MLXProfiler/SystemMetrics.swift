@@ -2,9 +2,6 @@
 // Copyright 2026 Vincent Gourbin
 
 import Foundation
-#if canImport(IOKit)
-import IOKit
-#endif
 import MLX
 
 /// Low-level system metrics for Apple Silicon.
@@ -13,34 +10,20 @@ import MLX
 /// footprint (via task_info) without requiring root access.
 public enum SystemMetrics {
 
+    /// Shared reader, so the IO registry is walked once for the whole process
+    /// rather than on every call.
+    private static let sharedGPUReader = GPUUtilizationReader(preferred: .deviceUtilization)
+
     /// Instantaneous GPU utilization % (0-100).
     ///
     /// On macOS: reads `Device Utilization %` from the AGX accelerator driver via IOKit.
     /// On iOS: returns 0 (IOKit is not available; use Instruments for GPU profiling).
+    ///
+    /// This is a *point* sample and a poor description of a short interval — see
+    /// ``GPUUtilizationBackend/deviceUtilization``. Prefer the session's sampler,
+    /// which averages over time, for anything you intend to draw a conclusion from.
     public static func gpuUtilization() -> Int {
-        #if canImport(IOKit)
-        var iterator: io_iterator_t = 0
-        let matching = IOServiceMatching("IOAccelerator")
-        guard IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) == KERN_SUCCESS else { return 0 }
-        defer { IOObjectRelease(iterator) }
-
-        var service = IOIteratorNext(iterator)
-        while service != 0 {
-            var properties: Unmanaged<CFMutableDictionary>?
-            if IORegistryEntryCreateCFProperties(service, &properties, kCFAllocatorDefault, 0) == KERN_SUCCESS,
-               let dict = properties?.takeRetainedValue() as? [String: Any],
-               let perfStats = dict["PerformanceStatistics"] as? [String: Any],
-               let utilization = perfStats["Device Utilization %"] as? Int {
-                IOObjectRelease(service)
-                return utilization
-            }
-            IOObjectRelease(service)
-            service = IOIteratorNext(iterator)
-        }
-        return 0
-        #else
-        return 0
-        #endif
+        sharedGPUReader.read()
     }
 
     /// Cumulative CPU time (user + system) for this process in seconds.

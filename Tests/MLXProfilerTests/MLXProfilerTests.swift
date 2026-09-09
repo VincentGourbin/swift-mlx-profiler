@@ -122,13 +122,35 @@ struct ProfilingSessionTests {
         #expect(report.contains("GPU%"))
     }
 
-    @Test func testMemoryTimeline() {
-        let session = ProfilingSession()
+    /// Opting in to boundary snapshots still puts one entry on each side of the
+    /// phase — the pre-1.5 contract, now behind a flag.
+    @Test func testMemoryTimelineWithBoundarySnapshots() {
+        let session = ProfilingSession(config: ProfilingConfig(
+            enableSampling: false, snapshotAtPhaseBoundaries: true))
         session.beginPhase("Test", category: .textEncoding)
         session.endPhase("Test", category: .textEncoding)
+        session.finish()
+
         let timeline = session.getMemoryTimeline()
         #expect(timeline.count == 2)
+        #expect(timeline[0].context == "begin:Test")
+        #expect(timeline[1].context == "end:Test")
         #expect(timeline[0].gpuUtilization >= 0)
+        #expect(timeline[0].cpuTimeSeconds > 0)
+    }
+
+    /// By default the boundaries stay cheap and the sampler supplies the data,
+    /// so the timeline is made of `sample` entries instead.
+    @Test func testMemoryTimelineFromSampler() {
+        let session = ProfilingSession(config: ProfilingConfig(samplingIntervalMs: 5))
+        session.beginPhase("Test", category: .textEncoding)
+        Thread.sleep(forTimeInterval: 0.1)
+        session.endPhase("Test", category: .textEncoding)
+        session.finish()
+
+        let timeline = session.getMemoryTimeline()
+        #expect(timeline.allSatisfy { $0.context == "sample" })
+        #expect(timeline.count >= 2)
         #expect(timeline[0].cpuTimeSeconds > 0)
     }
 }
