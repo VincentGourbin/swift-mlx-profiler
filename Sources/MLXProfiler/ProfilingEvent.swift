@@ -190,7 +190,11 @@ public struct ProfilingEvent: Sendable, Codable {
     }
 }
 
-/// Memory and utilization timeline entry for counter events
+/// Memory and utilization timeline entry for counter events.
+///
+/// `context` says where the entry came from: `begin:<phase>` / `end:<phase>` for
+/// a phase boundary snapshot, `step:<i>/<n>` for a step, and `sample` for a
+/// periodic reading from the background sampler (the common case since 1.5).
 public struct MemoryTimelineEntry: Sendable, Codable {
     public let timestampUs: UInt64
     public let context: String
@@ -200,4 +204,39 @@ public struct MemoryTimelineEntry: Sendable, Codable {
     public let processFootprintMB: Double
     public let cpuTimeSeconds: Double
     public let gpuUtilization: Int
+
+    // System-wide memory. Present only on entries where it was refreshed, which
+    // runs at a slower cadence than the rest.
+    public let systemAnonymousMB: Double?
+    public let systemCompressorOccupiedMB: Double?
+    public let systemCompressorStoredMB: Double?
+    public let systemWiredMB: Double?
+    public let systemFileBackedMB: Double?
+    public let systemSpeculativeMB: Double?
+    public let systemSwapUsedMB: Double?
+    public let systemMemoryStatusLevel: Int?
+
+    public init(
+        timestampUs: UInt64, context: String,
+        mlxActiveMB: Double, mlxCacheMB: Double, mlxPeakMB: Double,
+        processFootprintMB: Double, cpuTimeSeconds: Double, gpuUtilization: Int,
+        systemMemory: SystemMemorySnapshot? = nil
+    ) {
+        self.timestampUs = timestampUs
+        self.context = context
+        self.mlxActiveMB = mlxActiveMB
+        self.mlxCacheMB = mlxCacheMB
+        self.mlxPeakMB = mlxPeakMB
+        self.processFootprintMB = processFootprintMB
+        self.cpuTimeSeconds = cpuTimeSeconds
+        self.gpuUtilization = gpuUtilization
+        self.systemAnonymousMB = systemMemory?.anonymousMB
+        self.systemCompressorOccupiedMB = systemMemory?.compressorOccupiedMB
+        self.systemCompressorStoredMB = systemMemory?.compressorStoredMB
+        self.systemWiredMB = systemMemory?.wiredMB
+        self.systemFileBackedMB = systemMemory?.fileBackedMB
+        self.systemSpeculativeMB = systemMemory?.speculativeMB
+        self.systemSwapUsedMB = systemMemory?.swapUsedMB
+        self.systemMemoryStatusLevel = systemMemory?.memoryStatusLevel
+    }
 }
