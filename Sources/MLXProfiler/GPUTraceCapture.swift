@@ -36,9 +36,8 @@ public enum GPUCaptureError: Error, CustomStringConvertible {
     }
 }
 
-/// Capture and Metal System Trace merging are orchestration, not hot paths, and
-/// are **not** thread-safe against each other: drive them from a single thread.
-/// Phase and step recording remain safe to call from anywhere.
+/// A session holds one capture slot, claimed atomically, so a second concurrent
+/// `beginGPUCapture` fails cleanly rather than corrupting the first.
 extension ProfilingSession {
 
     /// Captures the Metal work done by `body` into a `.gputrace` file.
@@ -59,7 +58,7 @@ extension ProfilingSession {
         var stopped = false
         // If `body` throws, the capture still has to be closed or every later one
         // fails with "already capturing".
-        defer { if !stopped { try? endGPUCapture() } }
+        defer { if !stopped { _ = try? endGPUCapture() } }
         let result = try body()
         stopped = true
         _ = try endGPUCapture()
@@ -70,7 +69,6 @@ extension ProfilingSession {
     @discardableResult
     public func beginGPUCapture(phase: String, to url: URL? = nil) throws -> URL {
         guard RunEnvironment.isMetalCaptureEnabled else { throw GPUCaptureError.captureNotEnabled }
-        if let active = activeCapture { throw GPUCaptureError.alreadyCapturing(phase: active.phase) }
 
         let destination = url ?? defaultCaptureURL(for: phase)
         if FileManager.default.fileExists(atPath: destination.path) {
@@ -79,9 +77,13 @@ extension ProfilingSession {
         try FileManager.default.createDirectory(
             at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
 
+        // Claim the slot before touching Metal, so two threads racing here cannot
+        // both start a capture.
         let timestamp = currentTimestampUsPublic()
+        if let busy = claimCaptureSlot(phase: phase, url: destination, startUs: timestamp) {
+            throw GPUCaptureError.alreadyCapturing(phase: busy)
+        }
         GPU.startCapture(url: destination)
-        activeCapture = (phase: phase, url: destination, startUs: timestamp)
         recordInstant("GPU capture start: \(phase)", category: .custom, timestampUs: timestamp)
         return destination
     }
@@ -89,8 +91,7 @@ extension ProfilingSession {
     /// Stops the running capture and returns the file it produced.
     @discardableResult
     public func endGPUCapture() throws -> URL {
-        guard let active = activeCapture else { throw GPUCaptureError.notCapturing }
-        activeCapture = nil
+        guard let active = releaseCaptureSlot() else { throw GPUCaptureError.notCapturing }
 
         GPU.stopCapture(url: active.url)
         recordInstant("GPU capture end: \(active.phase)", category: .custom,
@@ -99,12 +100,12 @@ extension ProfilingSession {
         guard FileManager.default.fileExists(atPath: active.url.path) else {
             throw GPUCaptureError.notProduced(active.url)
         }
-        gpuCaptures.append((phase: active.phase, url: active.url))
+        appendCapture(phase: active.phase, url: active.url)
         return active.url
     }
 
     /// Captures written during this session.
-    public var gpuTraceCaptures: [(phase: String, url: URL)] { gpuCaptures }
+    public var gpuTraceCaptures: [(phase: String, url: URL)] { snapshotCaptures() }
 
     private func defaultCaptureURL(for phase: String) -> URL {
         let directory = config.outputDirectory ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)

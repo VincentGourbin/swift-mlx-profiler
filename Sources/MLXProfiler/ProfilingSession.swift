@@ -55,14 +55,14 @@ public final class ProfilingSession: @unchecked Sendable {
     /// Sleep-related `pmset -g` settings recorded at session start.
     public let powerManagementSettings: [String: String]
 
-    /// GPU kernel intervals merged in from a Metal System Trace, if any.
-    internal var gpuKernelIntervals: [GPUKernelInterval] = []
-    /// Metal captures written during this session, as (phase, file).
-    internal var gpuCaptures: [(phase: String, url: URL)] = []
-    /// The capture currently in flight, if any.
-    internal var activeCapture: (phase: String, url: URL, startUs: UInt64)?
-    /// Summary of the last merged Metal System Trace, if any.
-    internal var gpuKernelSummary: GPUKernelSummary?
+    // Capture and Metal System Trace state. Private on purpose: it is read by
+    // `generateReport()` and by the Chrome Trace exporter, which callers run on
+    // whatever thread they like, so it goes through the lock like everything
+    // else. Reach it via the accessors below, never directly.
+    private var gpuKernelIntervals: [GPUKernelInterval] = []
+    private var gpuCaptures: [(phase: String, url: URL)] = []
+    private var activeCapture: (phase: String, url: URL, startUs: UInt64)?
+    private var gpuKernelSummary: GPUKernelSummary?
 
     public init(config: ProfilingConfig = .singleRun, subsystem: String = "com.mlxprofiler") {
         let sessionId = UUID().uuidString
@@ -307,6 +307,49 @@ public final class ProfilingSession: @unchecked Sendable {
         lock.lock()
         events.append(ProfilingEvent(name: name, category: category, phase: .instant, timestampUs: timestampUs))
         lock.unlock()
+    }
+
+    // MARK: - Capture and GPU-kernel state
+    //
+    // Each of these takes the lock and releases it before returning, so none of
+    // them may be called while it is already held — `NSLock` is not reentrant,
+    // and `recordInstant` above takes it too.
+
+    /// Claims the single capture slot. Returns the phase already holding it, if
+    /// any, in which case the slot was not claimed.
+    internal func claimCaptureSlot(phase: String, url: URL, startUs: UInt64) -> String? {
+        lock.lock(); defer { lock.unlock() }
+        if let active = activeCapture { return active.phase }
+        activeCapture = (phase, url, startUs)
+        return nil
+    }
+
+    /// Releases the capture slot and returns what it held.
+    internal func releaseCaptureSlot() -> (phase: String, url: URL, startUs: UInt64)? {
+        lock.lock(); defer { lock.unlock() }
+        let active = activeCapture
+        activeCapture = nil
+        return active
+    }
+
+    internal func appendCapture(phase: String, url: URL) {
+        lock.lock(); gpuCaptures.append((phase, url)); lock.unlock()
+    }
+
+    internal func snapshotCaptures() -> [(phase: String, url: URL)] {
+        lock.lock(); defer { lock.unlock() }; return gpuCaptures
+    }
+
+    internal func storeGPUKernels(intervals: [GPUKernelInterval], summary: GPUKernelSummary) {
+        lock.lock()
+        gpuKernelIntervals = intervals
+        gpuKernelSummary = summary
+        lock.unlock()
+    }
+
+    internal func snapshotGPUKernels() -> (intervals: [GPUKernelInterval], summary: GPUKernelSummary?) {
+        lock.lock(); defer { lock.unlock() }
+        return (gpuKernelIntervals, gpuKernelSummary)
     }
 }
 

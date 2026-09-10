@@ -155,12 +155,30 @@ public final class MetricsSampler: @unchecked Sendable {
 
             // Absolute deadlines, so a slow tick does not push every later one out.
             nextTick &+= intervalUs &* 1000
+            if !sleepUntil(nextTick) { return }
             let current = DispatchTime.now().uptimeNanoseconds
-            if nextTick > current {
-                Thread.sleep(forTimeInterval: Double(nextTick - current) / 1_000_000_000)
-            } else {
-                nextTick = current  // fell behind; resynchronize rather than spin
-            }
+            if nextTick < current { nextTick = current }  // fell behind; resynchronize
+        }
+    }
+
+    /// Sleeps until `deadline` (uptime nanoseconds), in slices, so that a stop
+    /// request is noticed promptly whatever the sampling interval is.
+    ///
+    /// Sleeping the whole interval in one go would make `stop()` wait a full
+    /// period; with an interval above a second it would outlast `stop()`'s own
+    /// timeout and leave the thread running after `stop()` returned.
+    ///
+    /// Returns false if the sampler was asked to stop.
+    private func sleepUntil(_ deadline: UInt64) -> Bool {
+        let maximumSliceNs: UInt64 = 50_000_000
+        while true {
+            lock.lock(); let shouldStop = stopping; lock.unlock()
+            if shouldStop { return false }
+
+            let now = DispatchTime.now().uptimeNanoseconds
+            guard deadline > now else { return true }
+            let slice = min(deadline - now, maximumSliceNs)
+            Thread.sleep(forTimeInterval: Double(slice) / 1_000_000_000)
         }
     }
 

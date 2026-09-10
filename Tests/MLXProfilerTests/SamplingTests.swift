@@ -280,3 +280,55 @@ struct RunEnvironmentTests {
         assertion.release()
     }
 }
+
+
+@Suite("Capture slot")
+struct CaptureSlotTests {
+
+    /// The slot has to be claimed atomically: two threads reaching
+    /// `beginGPUCapture` at once must not both start a Metal capture.
+    @Test func testOnlyOneClaimWins() {
+        let session = ProfilingSession(config: ProfilingConfig(enableSampling: false))
+        defer { session.finish() }
+
+        let url = URL(fileURLWithPath: "/tmp/does-not-matter.gputrace")
+        let winners = Atomic(0)
+        DispatchQueue.concurrentPerform(iterations: 64) { index in
+            if session.claimCaptureSlot(phase: "phase-\(index)", url: url, startUs: 0) == nil {
+                winners.increment()
+            }
+        }
+        #expect(winners.value == 1)
+
+        let released = session.releaseCaptureSlot()
+        #expect(released != nil)
+        #expect(session.releaseCaptureSlot() == nil)
+
+        // Once released, the slot is claimable again.
+        #expect(session.claimCaptureSlot(phase: "later", url: url, startUs: 0) == nil)
+        #expect(session.claimCaptureSlot(phase: "other", url: url, startUs: 0) == "later")
+        _ = session.releaseCaptureSlot()
+    }
+
+    /// Recorded captures survive concurrent appends and reads.
+    @Test func testConcurrentAppendsAreAllRecorded() {
+        let session = ProfilingSession(config: ProfilingConfig(enableSampling: false))
+        defer { session.finish() }
+
+        DispatchQueue.concurrentPerform(iterations: 100) { index in
+            session.appendCapture(phase: "p\(index)", url: URL(fileURLWithPath: "/tmp/\(index)"))
+            _ = session.snapshotCaptures()
+        }
+        #expect(session.gpuTraceCaptures.count == 100)
+    }
+}
+
+/// Minimal lock-backed counter; the tests only need something safe to bump from
+/// several threads at once.
+private final class Atomic: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: Int
+    init(_ value: Int) { storage = value }
+    var value: Int { lock.lock(); defer { lock.unlock() }; return storage }
+    func increment() { lock.lock(); storage += 1; lock.unlock() }
+}

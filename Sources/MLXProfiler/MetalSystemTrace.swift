@@ -129,7 +129,10 @@ public enum MetalSystemTrace {
         private var stopped = false
         private let lock = NSLock()
 
-        init(output: URL, process: Process, logURL: URL) {
+        private let logHandle: FileHandle?
+
+        init(output: URL, process: Process, logURL: URL, logHandle: FileHandle? = nil) {
+            self.logHandle = logHandle
             self.output = output
             self.process = process
             self.logURL = logURL
@@ -179,6 +182,9 @@ public enum MetalSystemTrace {
                 process.terminate()
                 throw MetalSystemTraceError.recordingFailed(status: -1, output: log())
             }
+            // xctrace has exited, so nothing more will be written to the log.
+            try? logHandle?.close()
+
             guard FileManager.default.fileExists(atPath: output.path) else {
                 throw MetalSystemTraceError.recordingFailed(
                     status: process.terminationStatus, output: log())
@@ -229,7 +235,7 @@ public enum MetalSystemTrace {
         do { try process.run() } catch {
             throw MetalSystemTraceError.recordingFailed(status: -1, output: "\(error)")
         }
-        return Recorder(output: output, process: process, logURL: logURL)
+        return Recorder(output: output, process: process, logURL: logURL, logHandle: logHandle)
     }
 
     // MARK: - Export

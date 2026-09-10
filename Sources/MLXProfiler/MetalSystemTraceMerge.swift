@@ -55,7 +55,6 @@ extension ProfilingSession {
         }.sorted { $0.startUs < $1.startUs }
 
         let commandBuffers = MetalSystemTrace.commandBufferCount(from: trace, pid: pid)
-        gpuKernelIntervals = intervals
 
         var byChannel: [String: (count: Int, intervals: [GPUKernelInterval])] = [:]
         var byFamily: [String: (count: Int, totalUs: UInt64)] = [:]
@@ -81,12 +80,12 @@ extension ProfilingSession {
                 .map { ($0.key, $0.value.count, $0.value.totalUs) }
                 .sorted { $0.2 > $1.2 }
         )
-        gpuKernelSummary = summary
+        storeGPUKernels(intervals: intervals, summary: summary)
         return summary
     }
 
     /// GPU intervals merged into this session, in session time.
-    public var mergedGPUKernelIntervals: [GPUKernelInterval] { gpuKernelIntervals }
+    public var mergedGPUKernelIntervals: [GPUKernelInterval] { snapshotGPUKernels().intervals }
 
     // MARK: - Clock alignment
 
@@ -165,16 +164,17 @@ extension ProfilingSession {
     func buildGPUKernelSection() -> String {
         var report = ""
 
-        if !gpuCaptures.isEmpty {
+        let captures = snapshotCaptures()
+        if !captures.isEmpty {
             report += "\n  METAL CAPTURES\n"
             report += "  \(String(repeating: "\u{2500}", count: 66))\n"
-            for capture in gpuCaptures {
+            for capture in captures {
                 report += "  \(capture.phase): \(capture.url.lastPathComponent)\n"
             }
             report += "  Open in Xcode for per-kernel detail.\n"
         }
 
-        guard let summary = gpuKernelSummary, summary.intervalCount > 0 else { return report }
+        guard let summary = snapshotGPUKernels().summary, summary.intervalCount > 0 else { return report }
 
         report += "\n  GPU KERNELS (Metal System Trace)\n"
         report += "  \(String(repeating: "\u{2500}", count: 66))\n"

@@ -97,6 +97,14 @@ final class IOReportGPUResidency {
         guard residencySplit(of: baseline) != nil else { return nil }
     }
 
+    deinit {
+        // libIOReport exports no dispose function, but the subscription is a real
+        // Core Foundation object — CFGetTypeID reports "IOReportSubscription" —
+        // so releasing it is how it is freed. Without this every reader leaks one
+        // subscription for the life of the process.
+        Unmanaged<AnyObject>.fromOpaque(subscription).release()
+    }
+
     /// Percentage of the interval since the previous call that the GPU spent in a
     /// non-idle power state (0-100).
     func readActiveResidencyPercent() -> Int {
